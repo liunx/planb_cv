@@ -66,8 +66,9 @@ vector<Point2f>
 findMarker(int id, vector<int> &ids, vector<vector<Point2f>> &corners)
 {
     for (auto i=0; i < ids.size(); i++) {
-        if (ids[i] == id)
+        if (ids[i] == id) {
             return corners.at(i);
+        }
     }
     return {};
 }
@@ -107,7 +108,7 @@ int main(int argc, char *argv[]) {
 
     Ptr<aruco::DetectorParameters> detectorParams = aruco::DetectorParameters::create();
 
-    Ptr<Tracker> tracker = TrackerKCF::create();
+    Ptr<Tracker> tracker;
 
     VideoCapture inputVideo;
     int waitTime;
@@ -127,6 +128,9 @@ int main(int argc, char *argv[]) {
     bool flag_detect = true;
     bool flag_tracker_update = false;
 
+    inputVideo.set(CAP_PROP_FRAME_WIDTH, 640);
+    inputVideo.set(CAP_PROP_FRAME_HEIGHT, 360);
+
     while(inputVideo.grab()) {
         Mat frame;
         double ticks = (double)getTickCount();
@@ -143,6 +147,7 @@ int main(int argc, char *argv[]) {
                     auto result_y = std::minmax_element(begin(ys), end(ys));
                     bbox = Rect(Point2f(*result_x.first, *result_y.first),
                                 Point2f(*result_x.second, *result_y.second));
+                    tracker = TrackerKCF::create();
                     tracker->init(frame, bbox);
                     flag_tracker_update = true;
                     flag_detect = false;
@@ -151,7 +156,7 @@ int main(int argc, char *argv[]) {
         }
         if (flag_tracker_update) {
             if (tracker->update(frame, bbox)) {
-                rectangle(frame, bbox, Scalar(255, 0, 0), 2, 1);
+                rectangle(frame, bbox, Scalar(255, 0, 255), 2, 1);
             }
             else {
                 printf("tracking error!!!\n");
@@ -165,7 +170,7 @@ int main(int argc, char *argv[]) {
                 Point(10, 50), FONT_HERSHEY_SIMPLEX, 1.3, Scalar(0, 0, 255), 4);
         imshow("out", frame);
 
-        //printf("FPS: %.2f\n", fps);
+        printf("FPS: %.2f\n", fps);
 
         char key = (char)waitKey(waitTime);
         if(key == 27) break;
