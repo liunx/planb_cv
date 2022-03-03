@@ -147,7 +147,7 @@ int main(int argc, char *argv[]) {
                     auto result_y = std::minmax_element(begin(ys), end(ys));
                     bbox = Rect(Point2f(*result_x.first, *result_y.first),
                                 Point2f(*result_x.second, *result_y.second));
-                    tracker = TrackerKCF::create();
+                    tracker = TrackerMOSSE::create();
                     tracker->init(frame, bbox);
                     flag_tracker_update = true;
                     flag_detect = false;
