@@ -13,3 +13,4 @@ MACRO(add_exe name)
 ENDMACRO()
 
 add_exe(detect_markers)
+add_exe(planar_tracking)
