@@ -69,6 +69,13 @@ Mat Tracker::process(const Mat frame, Stats& stats)
 
     tm.start();
     detector->detectAndCompute(frame, noArray(), kp, desc);
+    if (desc.empty()) {
+        Mat res;
+        hconcat(first_frame, frame, res);
+        stats.inliers = 0;
+        stats.ratio = 0;
+        return res;
+    }
     stats.keypoints = (int)kp.size();
 
     vector< vector<DMatch> > matches;
@@ -92,7 +99,7 @@ Mat Tracker::process(const Mat frame, Stats& stats)
     tm.stop();
     stats.fps = 1. / tm.getTimeSec();
 
-    if(matched1.size() < 4 || homography.empty()) {
+    if(matched1.size() < 10 || homography.empty()) {
         Mat res;
         hconcat(first_frame, frame, res);
         stats.inliers = 0;
@@ -133,16 +140,18 @@ int main(int argc, char **argv)
 
     VideoCapture video_in;
 
-    if ( ( isdigit(input_path[0]) && input_path.size() == 1 ) )
+    if ((isdigit(input_path[0]) && input_path.size() == 1))
     {
-    int camera_no = input_path[0] - '0';
-        video_in.open( camera_no );
+        int camera_no = input_path[0] - '0';
+        video_in.open(camera_no);
     }
-    else {
+    else
+    {
         video_in.open(video_name);
     }
 
-    if(!video_in.isOpened()) {
+    if (!video_in.isOpened())
+    {
         cerr << "Couldn't open " << video_name << endl;
         return 1;
     }
@@ -150,19 +159,16 @@ int main(int argc, char **argv)
     video_in.set(CAP_PROP_FRAME_WIDTH, 640);
     video_in.set(CAP_PROP_FRAME_HEIGHT, 360);
 
-    Stats stats, akaze_stats, orb_stats;
-    Ptr<AKAZE> akaze = AKAZE::create();
-    akaze->setThreshold(akaze_thresh);
+    Stats stats, orb_stats;
     Ptr<ORB> orb = ORB::create();
     Ptr<DescriptorMatcher> matcher = DescriptorMatcher::create("BruteForce-Hamming");
-    example::Tracker akaze_tracker(akaze, matcher);
     example::Tracker orb_tracker(orb, matcher);
 
     Mat frame;
     namedWindow(video_name, WINDOW_NORMAL);
     cout << "\nPress any key to stop the video and select a bounding box" << endl;
 
-    while ( waitKey(1) < 1 )
+    while (waitKey(100) < 1)
     {
         video_in >> frame;
         cv::resizeWindow(video_name, frame.size());
@@ -176,11 +182,10 @@ int main(int argc, char **argv)
     bb.push_back(cv::Point2f(static_cast<float>(uBox.x+uBox.width), static_cast<float>(uBox.y+uBox.height)));
     bb.push_back(cv::Point2f(static_cast<float>(uBox.x), static_cast<float>(uBox.y+uBox.height)));
 
-    akaze_tracker.setFirstFrame(frame, bb, "AKAZE", stats);
     orb_tracker.setFirstFrame(frame, bb, "ORB", stats);
 
-    Stats akaze_draw_stats, orb_draw_stats;
-    Mat akaze_res, orb_res, res_frame;
+    Stats orb_draw_stats;
+    Mat orb_res, res_frame;
     int i = 0;
     for(;;) {
         i++;
@@ -189,12 +194,6 @@ int main(int argc, char **argv)
         // stop the program if no more images
         if(frame.empty()) break;
 
-        akaze_res = akaze_tracker.process(frame, stats);
-        akaze_stats += stats;
-        if(update_stats) {
-            akaze_draw_stats = stats;
-        }
-
         orb->setMaxFeatures(stats.keypoints);
         orb_res = orb_tracker.process(frame, stats);
         orb_stats += stats;
@@ -202,15 +201,12 @@ int main(int argc, char **argv)
             orb_draw_stats = stats;
         }
 
-        drawStatistics(akaze_res, akaze_draw_stats);
         drawStatistics(orb_res, orb_draw_stats);
-        vconcat(akaze_res, orb_res, res_frame);
+        vconcat(orb_res, res_frame);
         cv::imshow(video_name, res_frame);
         if(waitKey(1)==27) break; //quit on ESC button
     }
-    akaze_stats /= i - 1;
     orb_stats /= i - 1;
-    printStatistics("AKAZE", akaze_stats);
     printStatistics("ORB", orb_stats);
     return 0;
 }
