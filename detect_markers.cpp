@@ -42,10 +42,31 @@ the use of this software, even if advised of the possibility of such damage.
 #include <opencv2/aruco.hpp>
 #include <opencv2/tracking.hpp>
 #include <iostream>
+#include <thread>
+#include <chrono>
+#include <mutex>
+#include <stack>
+#include <bitset>
 #include "control.hpp"
+
+#define VIDEO_FRAME_WIDTH 640
+#define VIDEO_FRAME_HEIGHT 360
+#define WINDOW_NAME "Robot Control"
+
+#define BIT_ARUCO_DETECT 0
+#define BIT_TRACKER_UPDATE 1
 
 using namespace std;
 using namespace cv;
+
+namespace planb {
+    struct VisionData {
+        int64_t timestamp;
+        bitset<16> flagBits;
+        Rect2d boundingBox;
+        VisionData() { flagBits = 0; }
+    };
+}
 
 namespace {
 const char* about = "Basic marker detection";
@@ -72,6 +93,32 @@ findMarker(int id, vector<int> &ids, vector<vector<Point2f>> &corners)
     return {};
 }
 
+stack<planb::VisionData> visionStack;
+
+void robotController(planb::Robot& robot, mutex& mlock) noexcept
+{
+    auto freq = getTickFrequency();
+    planb::VisionData data_;
+
+    while (true) {
+        bool flagProcess = false;
+        this_thread::sleep_for(chrono::milliseconds(100));
+        if (!visionStack.empty()) {
+            mlock.lock();
+            data_ = visionStack.top();
+            visionStack.pop();
+            mlock.unlock();
+            flagProcess = true;
+        }
+        if (!flagProcess) continue;
+
+        // Checkpoint 1: timestamp
+        auto sec = (getTickCount() - data_.timestamp) / freq;
+        if (sec > 1.0f) {
+            robot.stop();
+        }
+    }
+}
 
 int main(int argc, char *argv[]) {
     CommandLineParser parser(argc, argv, keys);
@@ -108,22 +155,17 @@ int main(int argc, char *argv[]) {
     Ptr<aruco::DetectorParameters> detectorParams = aruco::DetectorParameters::create();
 
     Ptr<Tracker> tracker;
-    // Robot controller
-    planb::Robot robot = planb::Robot();
-    if (robot.init("/dev/ttyS5", 9600) < 0) {
-        std::cout << "Failed to init Robot controller!" << std::endl;
-        return -1;
-    }
-    robot.reset();
-
-
     VideoCapture inputVideo;
     int waitTime;
     if(!video.empty()) {
         inputVideo.open(video);
+        namedWindow(WINDOW_NAME, WINDOW_AUTOSIZE);
+        resizeWindow(WINDOW_NAME, VIDEO_FRAME_WIDTH, VIDEO_FRAME_HEIGHT);
         waitTime = 10;
     } else {
         inputVideo.open(camId);
+        inputVideo.set(CAP_PROP_FRAME_WIDTH, VIDEO_FRAME_WIDTH);
+        inputVideo.set(CAP_PROP_FRAME_HEIGHT, VIDEO_FRAME_HEIGHT);
         waitTime = 10;
     }
 
@@ -132,18 +174,27 @@ int main(int argc, char *argv[]) {
     vector<Point2f> corner;
     Rect2d bbox;
 
-    bool flag_detect = true;
-    bool flag_tracker_update = false;
+    bool flagDetect = true;
+    bool flagTrackerUpdate = false;
+    // Robot controller
+    planb::Robot robot = planb::Robot();
+    if (robot.init("/dev/ttyS5", 9600) < 0) {
+        std::cout << "Failed to init Robot controller!" << std::endl;
+        std::abort();
+    }
+    robot.reset();
 
-    inputVideo.set(CAP_PROP_FRAME_WIDTH, 640);
-    inputVideo.set(CAP_PROP_FRAME_HEIGHT, 360);
+    mutex lock_;
+    std::thread robotThread(robotController,std::ref(robot), std::ref(lock_));
 
+    TickMeter tm;
     while(inputVideo.grab()) {
         Mat frame;
-        double ticks = (double)getTickCount();
+        tm.start();
         inputVideo.retrieve(frame);
 
-        if (flag_detect) {
+        planb::VisionData data_ = planb::VisionData();
+        if (flagDetect) {
             aruco::detectMarkers(frame, dictionary, corners, ids, detectorParams, rejected);
             if (ids.size() > 0) {
                 corner = findMarker(searchId, ids, corners);
@@ -156,35 +207,44 @@ int main(int argc, char *argv[]) {
                                 Point2f(*result_x.second, *result_y.second));
                     tracker = TrackerMOSSE::create();
                     tracker->init(frame, bbox);
-                    flag_tracker_update = true;
-                    flag_detect = false;
-                    robot.setPower(4);
+                    flagTrackerUpdate = true;
+                    flagDetect = false;
+                    data_.flagBits.reset(BIT_ARUCO_DETECT);
+                    data_.flagBits.set(BIT_TRACKER_UPDATE);
                 }
             }
         }
-        if (flag_tracker_update) {
+        if (flagTrackerUpdate) {
             if (tracker->update(frame, bbox)) {
                 rectangle(frame, bbox, Scalar(255, 0, 255), 2, 1);
+                data_.boundingBox = bbox;
             }
             else {
-                printf("tracking error!!!\n");
-                robot.stop();
-                flag_tracker_update = false;
-                flag_detect = true;
+                cout << "tracking error!!!" << endl;
+                flagTrackerUpdate = false;
+                flagDetect = true;
+                data_.flagBits.set(BIT_ARUCO_DETECT);
+                data_.flagBits.reset(BIT_TRACKER_UPDATE);
             }
         }
-
-        double fps = getTickFrequency() / (getTickCount() - ticks);
+        data_.timestamp = getTickCount();
+        lock_.lock();
+        visionStack.push(data_);
+        lock_.unlock();
+        tm.stop();
+        auto cost = tm.getTimeMilli();
+        tm.reset();
 #if 0
-        putText(frame, format("FPS = %.2f", fps),
+        putText(frame, format("Cost %.2f ms", cost),
                 Point(10, 50), FONT_HERSHEY_SIMPLEX, 1.3, Scalar(0, 0, 255), 4);
-        imshow("out", frame);
+        imshow(WINDOW_NAME, frame);
 #endif
-        printf("FPS: %.2f\n", fps);
+        printf("Cost %.2f ms\n", cost);
 
         char key = (char)waitKey(waitTime);
         if(key == 27) break;
     }
+    robotThread.join();
 
     return 0;
 }
