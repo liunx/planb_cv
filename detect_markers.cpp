@@ -42,6 +42,7 @@ the use of this software, even if advised of the possibility of such damage.
 #include <opencv2/aruco.hpp>
 #include <opencv2/tracking.hpp>
 #include <iostream>
+#include "control.hpp"
 
 using namespace std;
 using namespace cv;
@@ -49,7 +50,6 @@ using namespace cv;
 namespace {
 const char* about = "Basic marker detection";
 
-//! [aruco_detect_markers_keys]
 const char* keys  =
         "{d        |       | dictionary: DICT_4X4_50=0, DICT_4X4_100=1, DICT_4X4_250=2,"
         "DICT_4X4_1000=3, DICT_5X5_50=4, DICT_5X5_100=5, DICT_5X5_250=6, DICT_5X5_1000=7, "
@@ -60,7 +60,6 @@ const char* keys  =
         "{ci       | 0     | Camera id if input doesnt come from video (-v) }"
         "{si        |       | searched marker id }";
 }
-//! [aruco_detect_markers_keys]
 
 vector<Point2f>
 findMarker(int id, vector<int> &ids, vector<vector<Point2f>> &corners)
@@ -109,6 +108,14 @@ int main(int argc, char *argv[]) {
     Ptr<aruco::DetectorParameters> detectorParams = aruco::DetectorParameters::create();
 
     Ptr<Tracker> tracker;
+    // Robot controller
+    planb::Robot robot = planb::Robot();
+    if (robot.init("/dev/ttyS5", 9600) < 0) {
+        std::cout << "Failed to init Robot controller!" << std::endl;
+        return -1;
+    }
+    robot.reset();
+
 
     VideoCapture inputVideo;
     int waitTime;
@@ -151,6 +158,7 @@ int main(int argc, char *argv[]) {
                     tracker->init(frame, bbox);
                     flag_tracker_update = true;
                     flag_detect = false;
+                    robot.setPower(4);
                 }
             }
         }
@@ -160,16 +168,18 @@ int main(int argc, char *argv[]) {
             }
             else {
                 printf("tracking error!!!\n");
+                robot.stop();
                 flag_tracker_update = false;
                 flag_detect = true;
             }
         }
 
         double fps = getTickFrequency() / (getTickCount() - ticks);
+#if 0
         putText(frame, format("FPS = %.2f", fps),
                 Point(10, 50), FONT_HERSHEY_SIMPLEX, 1.3, Scalar(0, 0, 255), 4);
         imshow("out", frame);
-
+#endif
         printf("FPS: %.2f\n", fps);
 
         char key = (char)waitKey(waitTime);
