@@ -47,7 +47,9 @@ the use of this software, even if advised of the possibility of such damage.
 #include <mutex>
 #include <stack>
 #include <bitset>
-#include "control.hpp"
+#include "robot_control.hpp"
+#include "data.hpp"
+#include "behavior_tree_nodes.hpp"
 
 #define VIDEO_FRAME_WIDTH 640
 #define VIDEO_FRAME_HEIGHT 360
@@ -58,15 +60,6 @@ the use of this software, even if advised of the possibility of such damage.
 
 using namespace std;
 using namespace cv;
-
-namespace planb {
-    struct VisionData {
-        int64_t timestamp;
-        bitset<16> flagBits;
-        Rect2d boundingBox;
-        VisionData() { flagBits = 0; }
-    };
-}
 
 namespace {
 const char* about = "Basic marker detection";
@@ -118,6 +111,22 @@ void robotController(planb::Robot& robot, mutex& mlock) noexcept
             robot.stop();
         }
     }
+}
+
+static BT::Tree buildBT(planb::Robot &robot,
+                        std::mutex &mlock,
+                        stack<planb::VisionData> &visionStack_,
+                        std::string &xml)
+{
+    BT::BehaviorTreeFactory factory;
+    BT::NodeBuilder builder_A = [&mlock, &visionStack_](const std::string &name, const BT::NodeConfiguration &config)
+    {
+        return std::make_unique<planb::SyncActionNode>(name, config, visionStack_, mlock);
+    };
+
+    factory.registerBuilder<planb::SyncActionNode>("SyncA", builder_A);
+    auto tree = factory.createTreeFromText(xml);
+    return tree;
 }
 
 int main(int argc, char *argv[]) {
