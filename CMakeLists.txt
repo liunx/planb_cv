@@ -11,7 +11,8 @@ include_directories(${OpenCV_INCLUDE_DIRS})
 add_subdirectory(third_parts/BehaviorTree.CPP)
 include_directories(third_parts/BehaviorTree.CPP/include)
 set(DEPS behaviortree_cpp_v3)
-set(SRCS src/main.cpp src/robot_control.cpp src/behavior_tree_nodes.cpp)
+set(SRCS src/main.cpp src/robot_control.cpp src/behavior_tree_nodes.cpp
+    src/action_nodes.cpp)
 
 ADD_EXECUTABLE(main ${SRCS})
 TARGET_LINK_LIBRARIES(main ${OpenCV_LIBS} ${DEPS})

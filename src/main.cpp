@@ -88,6 +88,8 @@ findMarker(int id, vector<int> &ids, vector<vector<Point2f>> &corners)
 
 void robotController(BT::Tree &tree) noexcept
 {
+    // wait for video stream get ready
+    this_thread::sleep_for(chrono::seconds(3));
     while (true) {
         tree.tickRoot();
         this_thread::sleep_for(chrono::milliseconds(1000));
@@ -136,8 +138,8 @@ int main(int argc, char *argv[]) {
     int waitTime;
     if(!video.empty()) {
         inputVideo.open(video);
-        namedWindow(WINDOW_NAME, WINDOW_AUTOSIZE);
-        resizeWindow(WINDOW_NAME, VIDEO_FRAME_WIDTH, VIDEO_FRAME_HEIGHT);
+        //namedWindow(WINDOW_NAME, WINDOW_AUTOSIZE);
+        //resizeWindow(WINDOW_NAME, VIDEO_FRAME_WIDTH, VIDEO_FRAME_HEIGHT);
         waitTime = 10;
     } else {
         inputVideo.open(camId);
@@ -162,8 +164,8 @@ int main(int argc, char *argv[]) {
     robot.reset();
     
     planb::VisionDataStack visionDataStack;
-    auto tree = buildBehaviorTree(robot, visionDataStack, xml);
-
+    planb::BehaviorTree btree = planb::BehaviorTree(visionDataStack, robot);
+    auto tree = btree.buildTree(xml);
     std::thread robotThread(robotController,std::ref(tree));
 
     TickMeter tm;
@@ -196,7 +198,7 @@ int main(int argc, char *argv[]) {
         if (flagTrackerUpdate) {
             if (tracker->update(frame, bbox)) {
                 rectangle(frame, bbox, Scalar(255, 0, 255), 2, 1);
-                data_.boundingBox = bbox;
+                data_.boundingBox = std::move(bbox);
             }
             else {
                 cout << "tracking error!!!" << endl;
@@ -207,6 +209,9 @@ int main(int argc, char *argv[]) {
             }
         }
         data_.timestamp = getTickCount();
+        visionDataStack.mlock.lock();
+        visionDataStack.visionData.push(std::move(data_));
+        visionDataStack.mlock.unlock();
         tm.stop();
         auto cost = tm.getTimeMilli();
         tm.reset();
@@ -214,8 +219,8 @@ int main(int argc, char *argv[]) {
         putText(frame, format("Cost %.2f ms", cost),
                 Point(10, 50), FONT_HERSHEY_SIMPLEX, 1.3, Scalar(0, 0, 255), 4);
         imshow(WINDOW_NAME, frame);
-#endif
         printf("Cost %.2f ms\n", cost);
+#endif
 
         char key = (char)waitKey(waitTime);
         if(key == 27) break;

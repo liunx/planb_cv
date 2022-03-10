@@ -8,14 +8,17 @@ namespace planb {
     class SyncActionNode : public BT::SyncActionNode {
 
     public:
+        typedef std::function<BT::NodeStatus(BT::TreeNode&)> TickFunctor;
         // additional arguments passed to the constructor
         SyncActionNode(const std::string &name,
                    const BT::NodeConfiguration &config,
                    Robot &robot,
-                   VisionDataStack &vdata)
+                   VisionDataStack &vdata,
+                   TickFunctor tick_functor)
             : BT::SyncActionNode(name, config),
             visionDataStack_(vdata),
-            robot_(robot)
+            robot_(robot),
+            tick_functor_(std::move(tick_functor))
         {
         }
 
@@ -25,23 +28,33 @@ namespace planb {
     private:
         VisionDataStack &visionDataStack_;
         Robot &robot_;
+    protected:
+        TickFunctor tick_functor_;
     };
 
-    inline BT::Tree buildBehaviorTree(planb::Robot &robot,
-                                      planb::VisionDataStack &vdata,
-                                      std::string &xml)
+    class BehaviorTree
     {
-        BT::BehaviorTreeFactory factory;
-        BT::NodeBuilder builder_A = [&robot, &vdata](const std::string &name,
-                                                     const BT::NodeConfiguration &config)
-        {
-            return std::make_unique<planb::SyncActionNode>(name, config, robot, vdata);
-        };
+    public:
+        BehaviorTree(VisionDataStack &visionDataStack, Robot &robot)
+            : visionDataStack_(visionDataStack),
+              robot_(robot),
+              factory_(),
+              tree_()
+        {}
 
-        factory.registerBuilder<planb::SyncActionNode>("SyncA", builder_A);
-        auto tree = factory.createTreeFromText(xml);
-        return tree;
-    }
+        void registerSyncAction(const std::string &ID,
+                                const BT::SimpleActionNode::TickFunctor &tick_functor,
+                                BT::PortsList ports={});
+
+        BT::Tree buildTree(const std::string &xml);
+
+    private:
+        void registerNodes();
+        VisionDataStack &visionDataStack_;
+        Robot &robot_;
+        BT::BehaviorTreeFactory factory_;
+        BT::Tree tree_;
+    };
 }
 
 #endif
