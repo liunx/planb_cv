@@ -4,9 +4,9 @@
 
 namespace planb 
 {
-    BT::NodeStatus ActionNodes::checkBattery()
+    BT::NodeStatus ActionNodes::checkFlags()
     {
-        if (flagBits_[BIT_TRACKER_UPDATE])
+        if (visionData_.flagBits[BIT_TRACKER_UPDATE])
             return BT::NodeStatus::SUCCESS;
         else
             return BT::NodeStatus::FAILURE;
@@ -18,13 +18,17 @@ namespace planb
 
         if (!vdata.empty()) {
             visionDataStack_.mlock.lock();
-            auto data = vdata.top();
+            visionData_ = vdata.top();
             vdata.pop();
             visionDataStack_.mlock.unlock();
-            flagBits_ = std::move(data.flagBits);
-            std::cout << "Bits: " << flagBits_ << std::endl;
             return BT::NodeStatus::SUCCESS;
         }
-        return BT::NodeStatus::RUNNING;
+        return BT::NodeStatus::FAILURE;
+    }
+
+    BT::NodeStatus ActionNodes::sayHello()
+    {
+        std::cout << "say: Hello!" << std::endl;
+        return BT::NodeStatus::SUCCESS;
     }
 }

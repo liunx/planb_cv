@@ -50,6 +50,14 @@ the use of this software, even if advised of the possibility of such damage.
 #include "robot_control.hpp"
 #include "data.hpp"
 #include "behavior_tree_nodes.hpp"
+#include "behaviortree_cpp_v3/loggers/bt_cout_logger.h"
+#include "behaviortree_cpp_v3/loggers/bt_minitrace_logger.h"
+#include "behaviortree_cpp_v3/loggers/bt_file_logger.h"
+#include "behaviortree_cpp_v3/bt_factory.h"
+
+#ifdef ZMQ_FOUND
+#include "behaviortree_cpp_v3/loggers/bt_zmq_publisher.h"
+#endif
 
 #define VIDEO_FRAME_WIDTH 640
 #define VIDEO_FRAME_HEIGHT 360
@@ -88,8 +96,15 @@ findMarker(int id, vector<int> &ids, vector<vector<Point2f>> &corners)
 
 void robotController(BT::Tree &tree) noexcept
 {
-    // wait for video stream get ready
-    this_thread::sleep_for(chrono::seconds(3));
+    BT::StdCoutLogger logger_cout(tree);
+    BT::FileLogger logger_file(tree, "logs/bt_trace.fbl");
+    BT::MinitraceLogger logger_minitrace(tree, "logs/bt_trace.json");
+#ifdef ZMQ_FOUND
+    // This logger publish status changes using ZeroMQ. Used by Groot
+    BT::PublisherZMQ publisher_zmq(tree);
+#endif
+    BT::printTreeRecursively(tree.rootNode());
+
     while (true) {
         tree.tickRoot();
         this_thread::sleep_for(chrono::milliseconds(1000));
@@ -169,12 +184,12 @@ int main(int argc, char *argv[]) {
     std::thread robotThread(robotController,std::ref(tree));
 
     TickMeter tm;
+    planb::VisionData data_ = planb::VisionData();
     while(inputVideo.grab()) {
         Mat frame;
         tm.start();
         inputVideo.retrieve(frame);
 
-        planb::VisionData data_ = planb::VisionData();
         if (flagDetect) {
             aruco::detectMarkers(frame, dictionary, corners, ids, detectorParams, rejected);
             if (ids.size() > 0) {
@@ -215,11 +230,11 @@ int main(int argc, char *argv[]) {
         tm.stop();
         auto cost = tm.getTimeMilli();
         tm.reset();
-#if 0
+#if 1
         putText(frame, format("Cost %.2f ms", cost),
                 Point(10, 50), FONT_HERSHEY_SIMPLEX, 1.3, Scalar(0, 0, 255), 4);
         imshow(WINDOW_NAME, frame);
-        printf("Cost %.2f ms\n", cost);
+        //printf("Cost %.2f ms\n", cost);
 #endif
 
         char key = (char)waitKey(waitTime);

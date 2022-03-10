@@ -11,14 +11,16 @@ namespace planb
         ActionNodes(VisionDataStack &visionDataStack, Robot &robot)
             : visionDataStack_(visionDataStack),
               robot_(robot),
-              flagBits_(0)
-        {}
-        BT::NodeStatus checkBattery();
+              visionData_()
+        {
+        }
+        BT::NodeStatus checkFlags();
         BT::NodeStatus checkStatus();
+        BT::NodeStatus sayHello();
     private:
         VisionDataStack &visionDataStack_;
         Robot &robot_;
-        std::bitset<16> flagBits_;
+        VisionData visionData_;
     };
 }
 

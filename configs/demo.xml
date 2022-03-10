@@ -3,14 +3,18 @@
     <!-- ////////// -->
     <BehaviorTree ID="BehaviorTree">
         <Sequence>
-            <Action ID="CheckStatus"/>
-            <Action ID="CheckBattery"/>
+            <SequenceStar>
+                <Action ID="CheckStatus"/>
+            </SequenceStar>
+            <Action ID="CheckFlags"/>
+            <Action ID="SayHello"/>
         </Sequence>
     </BehaviorTree>
     <!-- ////////// -->
     <TreeNodesModel>
-        <Action ID="CheckBattery"/>
+        <Action ID="CheckFlags"/>
         <Action ID="CheckStatus"/>
+        <Action ID="SayHello"/>
     </TreeNodesModel>
     <!-- ////////// -->
 </root>
