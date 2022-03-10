@@ -55,9 +55,6 @@ the use of this software, even if advised of the possibility of such damage.
 #define VIDEO_FRAME_HEIGHT 360
 #define WINDOW_NAME "Robot Control"
 
-#define BIT_ARUCO_DETECT 0
-#define BIT_TRACKER_UPDATE 1
-
 using namespace std;
 using namespace cv;
 
@@ -68,11 +65,14 @@ const char* keys  =
         "{d        |       | dictionary: DICT_4X4_50=0, DICT_4X4_100=1, DICT_4X4_250=2,"
         "DICT_4X4_1000=3, DICT_5X5_50=4, DICT_5X5_100=5, DICT_5X5_250=6, DICT_5X5_1000=7, "
         "DICT_6X6_50=8, DICT_6X6_100=9, DICT_6X6_250=10, DICT_6X6_1000=11, DICT_7X7_50=12,"
-        "DICT_7X7_100=13, DICT_7X7_250=14, DICT_7X7_1000=15, DICT_ARUCO_ORIGINAL = 16,"
+        "DICT_7X7_100=13, DICT_7X7_250=14, DICT_7X7_1000=15, DICT_ARUCO_ORIGINAL=16,"
         "DICT_APRILTAG_16h5=17, DICT_APRILTAG_25h9=18, DICT_APRILTAG_36h10=19, DICT_APRILTAG_36h11=20}"
-        "{v        |       | Input from video or image file, if ommited, input comes from camera }"
-        "{ci       | 0     | Camera id if input doesnt come from video (-v) }"
-        "{si        |       | searched marker id }";
+        "{v        |       | Input from video or image file, if omitted, input comes from camera }"
+        "{xml      |       | Behavior tree xml file }"
+        "{serial   | /dev/ttyS5 | Serial tty to open }"
+        "{baud     | 9600  | Baudrate for serial }"
+        "{ci       | 0     | Camera id if input doesn't come from video (-v) }"
+        "{si       |       | searched marker id }";
 }
 
 vector<Point2f>
@@ -86,47 +86,12 @@ findMarker(int id, vector<int> &ids, vector<vector<Point2f>> &corners)
     return {};
 }
 
-stack<planb::VisionData> visionStack;
-
-void robotController(planb::Robot& robot, mutex& mlock) noexcept
+void robotController(BT::Tree &tree) noexcept
 {
-    auto freq = getTickFrequency();
-    planb::VisionData data_;
-
     while (true) {
-        bool flagProcess = false;
-        this_thread::sleep_for(chrono::milliseconds(100));
-        if (!visionStack.empty()) {
-            mlock.lock();
-            data_ = visionStack.top();
-            visionStack.pop();
-            mlock.unlock();
-            flagProcess = true;
-        }
-        if (!flagProcess) continue;
-
-        // Checkpoint 1: timestamp
-        auto sec = (getTickCount() - data_.timestamp) / freq;
-        if (sec > 1.0f) {
-            robot.stop();
-        }
+        tree.tickRoot();
+        this_thread::sleep_for(chrono::milliseconds(1000));
     }
-}
-
-static BT::Tree buildBT(planb::Robot &robot,
-                        std::mutex &mlock,
-                        stack<planb::VisionData> &visionStack_,
-                        std::string &xml)
-{
-    BT::BehaviorTreeFactory factory;
-    BT::NodeBuilder builder_A = [&mlock, &visionStack_](const std::string &name, const BT::NodeConfiguration &config)
-    {
-        return std::make_unique<planb::SyncActionNode>(name, config, visionStack_, mlock);
-    };
-
-    factory.registerBuilder<planb::SyncActionNode>("SyncA", builder_A);
-    auto tree = factory.createTreeFromText(xml);
-    return tree;
 }
 
 int main(int argc, char *argv[]) {
@@ -140,6 +105,9 @@ int main(int argc, char *argv[]) {
 
     int camId = parser.get<int>("ci");
     int searchId = parser.get<int>("si");
+    int baud = parser.get<int>("baud");
+    cv::String xml = parser.get<cv::String>("xml");
+    cv::String serial = parser.get<cv::String>("serial");
 
     String video;
     if(parser.has("v")) {
@@ -187,14 +155,16 @@ int main(int argc, char *argv[]) {
     bool flagTrackerUpdate = false;
     // Robot controller
     planb::Robot robot = planb::Robot();
-    if (robot.init("/dev/ttyS5", 9600) < 0) {
+    if (robot.init(serial.c_str(), baud) < 0) {
         std::cout << "Failed to init Robot controller!" << std::endl;
         std::abort();
     }
     robot.reset();
+    
+    planb::VisionDataStack visionDataStack;
+    auto tree = buildBehaviorTree(robot, visionDataStack, xml);
 
-    mutex lock_;
-    std::thread robotThread(robotController,std::ref(robot), std::ref(lock_));
+    std::thread robotThread(robotController,std::ref(tree));
 
     TickMeter tm;
     while(inputVideo.grab()) {
@@ -237,9 +207,6 @@ int main(int argc, char *argv[]) {
             }
         }
         data_.timestamp = getTickCount();
-        lock_.lock();
-        visionStack.push(data_);
-        lock_.unlock();
         tm.stop();
         auto cost = tm.getTimeMilli();
         tm.reset();
