@@ -55,12 +55,14 @@ the use of this software, even if advised of the possibility of such damage.
 #include "behaviortree_cpp_v3/loggers/bt_file_logger.h"
 #include "behaviortree_cpp_v3/bt_factory.h"
 
+//#define BT_DEBUG
+
+#ifdef BT_DEBUG
 #ifdef ZMQ_FOUND
 #include "behaviortree_cpp_v3/loggers/bt_zmq_publisher.h"
 #endif
+#endif
 
-#define VIDEO_FRAME_WIDTH 640
-#define VIDEO_FRAME_HEIGHT 360
 #define WINDOW_NAME "Robot Control"
 
 using namespace std;
@@ -96,6 +98,7 @@ findMarker(int id, vector<int> &ids, vector<vector<Point2f>> &corners)
 
 void robotController(BT::Tree &tree) noexcept
 {
+#ifdef BT_DEBUG
     BT::StdCoutLogger logger_cout(tree);
     BT::FileLogger logger_file(tree, "logs/bt_trace.fbl");
     BT::MinitraceLogger logger_minitrace(tree, "logs/bt_trace.json");
@@ -104,10 +107,10 @@ void robotController(BT::Tree &tree) noexcept
     BT::PublisherZMQ publisher_zmq(tree);
 #endif
     BT::printTreeRecursively(tree.rootNode());
-
+#endif
     while (true) {
         tree.tickRoot();
-        this_thread::sleep_for(chrono::milliseconds(1000));
+        this_thread::sleep_for(chrono::milliseconds(50));
     }
 }
 
@@ -153,14 +156,14 @@ int main(int argc, char *argv[]) {
     int waitTime;
     if(!video.empty()) {
         inputVideo.open(video);
-        //namedWindow(WINDOW_NAME, WINDOW_AUTOSIZE);
-        //resizeWindow(WINDOW_NAME, VIDEO_FRAME_WIDTH, VIDEO_FRAME_HEIGHT);
-        waitTime = 10;
+        namedWindow(WINDOW_NAME, WINDOW_AUTOSIZE);
+        resizeWindow(WINDOW_NAME, VIDEO_FRAME_WIDTH, VIDEO_FRAME_HEIGHT);
+        waitTime = 50;
     } else {
         inputVideo.open(camId);
         inputVideo.set(CAP_PROP_FRAME_WIDTH, VIDEO_FRAME_WIDTH);
         inputVideo.set(CAP_PROP_FRAME_HEIGHT, VIDEO_FRAME_HEIGHT);
-        waitTime = 10;
+        waitTime = 1;
     }
 
     vector<int> ids;
@@ -212,7 +215,9 @@ int main(int argc, char *argv[]) {
         }
         if (flagTrackerUpdate) {
             if (tracker->update(frame, bbox)) {
+#ifdef BT_DEBUG
                 rectangle(frame, bbox, Scalar(255, 0, 255), 2, 1);
+#endif
                 data_.boundingBox = std::move(bbox);
             }
             else {
@@ -230,7 +235,7 @@ int main(int argc, char *argv[]) {
         tm.stop();
         auto cost = tm.getTimeMilli();
         tm.reset();
-#if 1
+#ifdef BT_DEBUG
         putText(frame, format("Cost %.2f ms", cost),
                 Point(10, 50), FONT_HERSHEY_SIMPLEX, 1.3, Scalar(0, 0, 255), 4);
         imshow(WINDOW_NAME, frame);
@@ -240,6 +245,7 @@ int main(int argc, char *argv[]) {
         char key = (char)waitKey(waitTime);
         if(key == 27) break;
     }
+    destroyAllWindows();
     robotThread.join();
 
     return 0;

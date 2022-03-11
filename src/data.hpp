@@ -5,6 +5,9 @@
 #include <bitset>
 #include "robot_control.hpp"
 
+#define VIDEO_FRAME_WIDTH 640
+#define VIDEO_FRAME_HEIGHT 360
+
 #define BIT_ARUCO_DETECT 0
 #define BIT_TRACKER_UPDATE 1
 

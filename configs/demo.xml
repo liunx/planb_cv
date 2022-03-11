@@ -3,18 +3,24 @@
     <!-- ////////// -->
     <BehaviorTree ID="BehaviorTree">
         <Sequence>
-            <SequenceStar>
-                <Action ID="CheckStatus"/>
-            </SequenceStar>
-            <Action ID="CheckFlags"/>
-            <Action ID="SayHello"/>
+            <Action ID="FetchData"/>
+            <Fallback>
+                <Action ID="FindTarget"/>
+                <ForceFailure>
+                    <Action ID="StopMoving"/>
+                </ForceFailure>
+            </Fallback>
+            <Sequence name="FollowTarget">
+                <Action ID="StartMoving"/>
+            </Sequence>
         </Sequence>
     </BehaviorTree>
     <!-- ////////// -->
     <TreeNodesModel>
-        <Action ID="CheckFlags"/>
-        <Action ID="CheckStatus"/>
-        <Action ID="SayHello"/>
+        <Action ID="FetchData"/>
+        <Action ID="FindTarget"/>
+        <Action ID="StartMoving"/>
+        <Action ID="StopMoving"/>
     </TreeNodesModel>
     <!-- ////////// -->
 </root>

@@ -26,9 +26,10 @@ namespace planb {
     void BehaviorTree::registerNodes()
     {
         static ActionNodes nodes = ActionNodes(visionDataStack_, robot_);
-        factory_.registerSimpleAction("CheckFlags", std::bind(&ActionNodes::checkFlags, &nodes));
-        factory_.registerSimpleAction("CheckStatus", std::bind(&ActionNodes::checkStatus, &nodes));
-        factory_.registerSimpleAction("SayHello", std::bind(&ActionNodes::sayHello, &nodes));
+        factory_.registerSimpleAction("FetchData", std::bind(&ActionNodes::fetchData, &nodes));
+        factory_.registerSimpleAction("FindTarget", std::bind(&ActionNodes::findTarget, &nodes));
+        factory_.registerSimpleAction("StartMoving", std::bind(&ActionNodes::startMoving, &nodes));
+        factory_.registerSimpleAction("StopMoving", std::bind(&ActionNodes::stopMoving, &nodes));
     }
 
     BT::Tree BehaviorTree::buildTree(const std::string &xml)

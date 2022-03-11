@@ -14,9 +14,10 @@ namespace planb
               visionData_()
         {
         }
-        BT::NodeStatus checkFlags();
-        BT::NodeStatus checkStatus();
-        BT::NodeStatus sayHello();
+        BT::NodeStatus fetchData();
+        BT::NodeStatus findTarget();
+        BT::NodeStatus startMoving();
+        BT::NodeStatus stopMoving();
     private:
         VisionDataStack &visionDataStack_;
         Robot &robot_;
