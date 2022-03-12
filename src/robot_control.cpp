@@ -66,9 +66,13 @@ namespace planb {
 
     void Robot::setPower(uint8_t val)
     {
+        if (power_ == val)
+            return;
+
         if (val > MIN_POWER_INDEX && val <= MAX_POWER_INDEX) {
             cmd_[1] = val;
             txData();
+            power_ = val;
         }
     }
 
@@ -88,6 +92,17 @@ namespace planb {
         }
     }
 
+    void Robot::setAngle(uint8_t val)
+    {
+        if (val == angle_)
+            return;
+        if (val > MIN_ANGLE_INDEX && val <= MAX_ANGLE_INDEX) {
+            cmd_[0] = val;
+            txData();
+            angle_ = val;
+        }
+    }
+
     void Robot::turnRight()
     {
         if (cmd_[0] <= MAX_ANGLE_INDEX) {
@@ -101,11 +116,14 @@ namespace planb {
         cmd_[0] = 6;
         cmd_[1] = 1;
         txData();
+        angle_ = 6;
+        power_ = 1;
     }
 
     void Robot::stop()
     {
         cmd_[1] = 1;
         txData();
+        power_ = 1;
     }
 }

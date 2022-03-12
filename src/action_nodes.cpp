@@ -28,16 +28,26 @@ namespace planb
 
     BT::NodeStatus ActionNodes::startMoving()
     {
+        auto padding = 30;
         auto bbox = visionData_.boundingBox;
-        auto area = bbox.width * bbox.height;
+        auto areaBox = bbox.width * bbox.height;
+        auto areaFrame = VIDEO_FRAME_WIDTH * VIDEO_FRAME_HEIGHT;
+        auto centerX = VIDEO_FRAME_WIDTH / 2;
 
         // too close, won't moving
-        if ((area / (VIDEO_FRAME_WIDTH * VIDEO_FRAME_HEIGHT)) > 0.5f) {
+        if ((areaBox / areaFrame) > 0.5f) {
             robot_.stop();
             return BT::NodeStatus::FAILURE;
         }
         // turning target into center
+        if (centerX > (bbox.x + bbox.width) + padding)
+            robot_.setAngle(4);
+        else if (centerX < bbox.x - padding)
+            robot_.setAngle(8);
+        else
+            robot_.setAngle(6);
 
+        robot_.setPower(3);
         return BT::NodeStatus::SUCCESS;
     }
 

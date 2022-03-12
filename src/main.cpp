@@ -187,10 +187,10 @@ int main(int argc, char *argv[]) {
     std::thread robotThread(robotController,std::ref(tree));
 
     TickMeter tm;
+    tm.start();
     planb::VisionData data_ = planb::VisionData();
     while(inputVideo.grab()) {
         Mat frame;
-        tm.start();
         inputVideo.retrieve(frame);
 
         if (flagDetect) {
@@ -235,6 +235,7 @@ int main(int argc, char *argv[]) {
         tm.stop();
         auto cost = tm.getTimeMilli();
         tm.reset();
+        tm.start();
 #ifdef BT_DEBUG
         putText(frame, format("Cost %.2f ms", cost),
                 Point(10, 50), FONT_HERSHEY_SIMPLEX, 1.3, Scalar(0, 0, 255), 4);

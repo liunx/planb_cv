@@ -17,7 +17,7 @@
 namespace planb {
     class Robot {
     public:
-        Robot()
+        Robot() : power_(1), angle_(6)
         {
             cmd_[0] = 0x06;
             cmd_[1] = 0x01;
@@ -31,12 +31,15 @@ namespace planb {
         void setPower(uint8_t val);
         void backward();
         void turnLeft();
+        void setAngle(uint8_t val);
         void turnRight();
         void stop();
     private:
         void txData();
         int fd_;
         uint8_t cmd_[4];
+        uint8_t power_;
+        uint8_t angle_;
     };
 }
 
