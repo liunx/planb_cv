@@ -113,17 +113,23 @@ namespace planb {
 
     void Robot::reset()
     {
-        cmd_[0] = 6;
-        cmd_[1] = 1;
-        txData();
-        angle_ = 6;
-        power_ = 1;
+        if (angle_ != 6 || power_ != 1)
+        {
+            cmd_[0] = 6;
+            cmd_[1] = 1;
+            txData();
+            angle_ = 6;
+            power_ = 1;
+        }
     }
 
     void Robot::stop()
     {
-        cmd_[1] = 1;
-        txData();
-        power_ = 1;
+        if (power_ != 1)
+        {
+            cmd_[1] = 1;
+            txData();
+            power_ = 1;
+        }
     }
 }
